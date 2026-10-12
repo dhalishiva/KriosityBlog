@@ -11,8 +11,8 @@ export const metadata: Metadata = {
   title: { default: `${site.name} — AI news, models and comparisons`, template: `%s | ${site.name}` },
   description: site.description,
   alternates: { canonical: blogUrl(), types: { "application/rss+xml": blogUrl("/rss.xml") } },
-  openGraph: { type: "website", siteName: "Kriosity", locale: "en_IN", url: blogUrl() },
-  twitter: { card: "summary_large_image" },
+  openGraph: { type: "website", siteName: "Kriosity", locale: "en_IN", url: blogUrl(), images: [{ url: blogUrl("/og"), width: 1200, height: 630, alt: "Kriosity Blog" }] },
+  twitter: { card: "summary_large_image", site: "@dhalishiva", images: [blogUrl("/og")] },
 };
 
 export const viewport: Viewport = { themeColor: "#f2f5f7", width: "device-width", initialScale: 1 };

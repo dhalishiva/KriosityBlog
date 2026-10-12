@@ -28,7 +28,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       description: post.summary ?? undefined,
       publishedTime: post.publish_at ?? undefined,
       modifiedTime: post.updated_at,
-      images: post.cover_image_url ? [post.cover_image_url] : undefined,
+      images: [{ url: post.cover_image_url ?? blogUrl(`/${post.slug}/og`), width: 1200, height: 630, alt: post.title }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      site: "@dhalishiva",
+      title: post.title,
+      description: post.summary ?? undefined,
+      images: [post.cover_image_url ?? blogUrl(`/${post.slug}/og`)],
     },
   };
 }

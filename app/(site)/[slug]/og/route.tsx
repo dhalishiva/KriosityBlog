@@ -4,13 +4,12 @@ import { getPublished } from "@/lib/posts";
 import { categoryLabel } from "@/lib/types";
 import { formatIST } from "@/lib/slots";
 
-// Share card for X, LinkedIn, WhatsApp etc. Served at /blog/<slug>/opengraph-image.
-export const alt = "Kriosity Blog post";
-export const size = ogSize;
-export const contentType = "image/png";
+// Share card for X, LinkedIn, WhatsApp etc. Served at /blog/<slug>/og (linked from generateMetadata).
+// A route handler instead of the opengraph-image file convention, because that convention
+// drops the /blog basePath from the URL it writes into the page.
 export const revalidate = 3600;
 
-export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
+export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = await getPublished(slug);
   const title = post?.title ?? "Kriosity Blog";
@@ -45,6 +44,6 @@ export default async function Image({ params }: { params: Promise<{ slug: string
         </div>
       </div>
     ),
-    size,
+    { ...ogSize, headers: { "Cache-Control": "public, max-age=3600, s-maxage=3600" } },
   );
 }

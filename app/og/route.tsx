@@ -1,11 +1,10 @@
+// Default share card for the blog. Served at /blog/og.
 import { ImageResponse } from "next/og";
 import { Gem, Mark, ogSize } from "@/lib/og";
 
-export const alt = "Kriosity Blog — AI, tested and explained";
-export const size = ogSize;
-export const contentType = "image/png";
+export const revalidate = 86400;
 
-export default function Image() {
+export function GET() {
   return new ImageResponse(
     (
       <div style={{ width: "100%", height: "100%", display: "flex", background: "#14203a", padding: "70px 80px", alignItems: "center", justifyContent: "space-between" }}>
@@ -21,6 +20,6 @@ export default function Image() {
         <Gem size={320} />
       </div>
     ),
-    size,
+    { ...ogSize, headers: { "Cache-Control": "public, max-age=86400, s-maxage=86400" } },
   );
 }
