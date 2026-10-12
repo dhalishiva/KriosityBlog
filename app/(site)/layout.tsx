@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Logo from "@/components/Logo";
 
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,7 +8,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         <div className="wrap">
           {/* Plain <a>: kriosity.in is a different app, outside the /blog base path */}
           <a href="https://kriosity.in" className="b-brand" aria-label="Kriosity home">
-            <strong>Kriosity</strong>
+            <Logo suffix="blog" />
           </a>
           <nav className="b-nav" aria-label="Main">
             <Link href="/">Blog</Link>

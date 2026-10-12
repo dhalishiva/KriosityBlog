@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import type { Session, SupabaseClient } from "@supabase/supabase-js";
 import { browserClient } from "@/lib/supabase";
 import Login from "./Login";
+import Logo from "@/components/Logo";
 
 type Ctx = { sb: SupabaseClient; session: Session; email: string; toast: (msg: string, undo?: () => void) => void };
 const AdminCtx = createContext<Ctx | null>(null);
@@ -72,8 +73,9 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
       <div className="a-root">
         <header className="a-top">
           <div className="in">
-            <span className="a-logo" aria-hidden="true">K</span>
-            <strong>Blog admin</strong>
+            <a href="/blog/admin" aria-label="Kriosity blog admin, queue" style={{ textDecoration: "none" }}>
+              <Logo size={26} suffix="blog admin" />
+            </a>
             <nav aria-label="Admin">
               {nav.map((n) => (
                 <Link key={n.href} href={n.href} aria-current={current(n.href) ? "page" : undefined}>

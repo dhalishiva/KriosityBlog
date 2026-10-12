@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { browserClient } from "@/lib/supabase";
+import Logo from "@/components/Logo";
 
 export default function Login() {
   const sb = browserClient();
@@ -48,8 +49,8 @@ export default function Login() {
   return (
     <div className="a-root a-login">
       <div className="brand">
-        <span className="k" aria-hidden="true">K</span>
-        <span className="over">Kriosity Blog · Admin</span>
+        <Logo light size={34} />
+        <span className="over">Blog · Admin</span>
         <h1>Review, approve and publish.</h1>
         <p>Only approved admin accounts can sign in.</p>
       </div>
