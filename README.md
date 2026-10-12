@@ -49,7 +49,7 @@ Public pages re-render every 5 minutes (ISR), so a post appears within ~5 minute
 | Database | Supabase project **KriosityOps** (ref `xfskyegiwupjkuepiavx`, region ap-south-1). Blog tables are all prefixed `blog_` in `public`. They share the project with KriosityOps but have no links to its tables |
 | Auth | Supabase Auth of the same project. Admin login: **shiva.dhali@kriosity.in**. That account is also a KriosityOps admin (KriosityOps' own `handle_new_user` trigger), which is expected |
 | Drafting brief | `pipeline/DRAFTING_PROMPT.md` |
-| Android review app | Not built yet. UI kit (screens: sign in, queue, draft reader, reject sheet, comments, schedule, tokens/components) is a Claude Design canvas titled "Kriosity Blog Review App". It will use the same Supabase tables and RLS as the web admin |
+| Android review app | Not built yet. **Build spec: `docs/ANDROID_UI_KIT.md`** (tokens, components, screens, data mapping). UI kit (screens: sign in, queue, draft reader, reject sheet, comments, schedule, tokens/components) is a Claude Design canvas titled "Kriosity Blog Review App". It will use the same Supabase tables and RLS as the web admin |
 
 ## 3. Data model (`supabase/migrations/001_blog_schema.sql`)
 
@@ -173,5 +173,5 @@ subscribers, password), drafting brief, move scripts, `/blog` routing from krios
 Next:
 - [ ] Daily drafting job as a scheduled task (05:30 IST) using `pipeline/DRAFTING_PROMPT.md`.
 - [ ] Weekly newsletter send for `blog_subscribers` (Sunday roundup).
-- [ ] Android review app from the UI kit (Kotlin/Compose or React Native), same Supabase tables; push notification when drafts arrive.
+- [ ] Android review app per `docs/ANDROID_UI_KIT.md` (Kotlin/Compose or React Native), same Supabase tables; push notification when drafts arrive.
 - [ ] Optional: cover images per post, Open Graph image generation.
