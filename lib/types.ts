@@ -34,6 +34,8 @@ export type Post = {
   tags: string[];
   status: PostStatus;
   publish_at: string | null;
+  /** Publishing slot given at drafting: morning = 09:00 IST, evening = 18:00 IST. */
+  slot: "morning" | "evening" | null;
   sources: Source[];
   fact_flags: FactFlag[];
   related_product: string | null;

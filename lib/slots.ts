@@ -40,3 +40,22 @@ export function toLocalInput(d: Date | string): string {
 export function fromLocalInput(v: string): string {
   return new Date(Date.parse(v + ":00Z") - IST_OFFSET_MIN * 60_000).toISOString();
 }
+
+export type Slot = "morning" | "evening";
+export const SLOT_TIME: Record<Slot, string> = { morning: "09:00", evening: "18:00" };
+export const SLOT_LABEL: Record<Slot, string> = { morning: "Morning · 9:00 AM", evening: "Evening · 6:00 PM" };
+
+/** ISO timestamp for a slot on an IST calendar date ("YYYY-MM-DD"). */
+export function slotIso(dateIST: string, slot: Slot): string {
+  return fromLocalInput(`${dateIST}T${SLOT_TIME[slot]}`);
+}
+
+/** IST calendar date ("YYYY-MM-DD") of a timestamp. */
+export function istDate(d: Date | string): string {
+  return toLocalInput(d).slice(0, 10);
+}
+
+/** Which slot a timestamp falls in (morning before 13:30 IST, else evening). */
+export function slotOf(iso: string | Date): Slot {
+  return toLocalInput(iso).slice(11, 16) < "13:30" ? "morning" : "evening";
+}

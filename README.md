@@ -3,9 +3,11 @@
 The blog at **https://kriosity.in/blog**: hands-on AI coverage (new models, comparisons, events,
 guides, a weekly roundup) for developers, founders and IT teams, especially in India.
 
-Posts are **drafted by an AI** (planned: every morning at 05:30 IST — see §10 for what is running today) and **published only after a human
-approves them** in the admin app at **https://kriosity.in/blog/admin**. Every post must list the
-sources its facts come from; the database enforces this.
+Posts are **drafted by an AI** (planned: every morning at 05:30 IST — see §10 for what is running today).
+Each draft gets a fixed **slot** — morning (09:00 IST) or evening (18:00 IST) — and **posts automatically
+at that slot unless the admin rejects it** in the admin app at **https://kriosity.in/blog/admin**.
+Every post must list the sources its facts come from; the database enforces this, and a draft with no
+sources never posts.
 
 Owner: Shiva Dhali (Kriosity, Noida). This README is the handoff document: any developer or AI
 assistant should be able to continue the project from it alone.
@@ -15,28 +17,38 @@ assistant should be able to continue the project from it alone.
 ## 1. How it works
 
 ```
- 05:30 IST  Drafting job (AI)                    Admin (Shiva)                         Public
- ─────────────────────────────                    ──────────────────────────            ─────────────────
- reads pipeline/DRAFTING_PROMPT.md                kriosity.in/blog/admin                kriosity.in/blog
- 1. handles feedback (revising posts,             (later: Android app, same API)
-    unhandled admin comments)                     • Pending → read, comment
- 2. researches 2 topics (+ Sunday roundup)        • Approve → pick slot (9 AM / 6 PM)   shows posts where
- 3. INSERT blog_posts status='pending'  ───────►  • Reject / send back for rewrite  ──► status='approved'
-    with sources[] and fact_flags[]               • Edit, delete, restore                and publish_at <= now()
-                                                  • Subscribers list / CSV
+ 05:30 IST  Drafting job (AI)                 Admin (Shiva), any time before the slot     09:00 / 18:00 IST  DB job
+ ────────────────────────────                 ────────────────────────────────────────     ─────────────────────────
+ reads pipeline/DRAFTING_PROMPT.md            kriosity.in/blog/admin (later: Android)     pg_cron → blog_publish_due()
+ 1. handles feedback (revising posts,         • read, comment, edit                       pending + due + has sources
+    unhandled admin comments)                 • Reject  ← the only way to stop a post       → status 'approved'
+ 2. drafts 2 posts (Sun: 1 + roundup)         • Send back → Claude rewrites, new slot     (logged as auto_published)
+ 3. INSERT status='pending', slot,   ───────► • Approve early (optional)            ───►
+    publish_at = today 09:00 / 18:00          • Change slot, delete, restore              kriosity.in/blog shows
+                                                                                          status='approved' and
+                                                                                          publish_at <= now()
 ```
 
-There is **no publish cron**. A post is live when `status = 'approved'` and `publish_at <= now()`.
-Public pages re-render every 5 minutes (ISR), so a post appears within ~5 minutes of its slot.
+**Slots.** morning = 09:00 IST, evening = 18:00 IST. The drafting job gives post 1 the morning slot and
+post 2 the evening slot (Sundays: the weekly roundup takes the evening). The admin can move a post to
+another date/slot, or publish it now.
+
+**Publishing.** Two pg_cron jobs (`blog-publish-morning` 03:30 UTC, `blog-publish-evening` 12:30 UTC)
+call `blog_publish_due()`, which flips every `pending` draft whose `publish_at` has passed and that has at
+least one source to `approved`. Because each run only takes posts whose time has come, the 9 AM run picks
+the morning post and the 6 PM run the evening post. Public pages re-render every 5 minutes (ISR), so a post
+appears within ~5 minutes of its slot.
+
+**Never auto-posted:** `rejected`, `revising` (sent back; gets a new slot after the rewrite), deleted, or no sources.
 
 ### Post lifecycle (`blog_posts.status`)
 
 | status     | meaning                                                         | set by            |
 |------------|-----------------------------------------------------------------|-------------------|
-| `pending`  | waiting for admin review                                        | drafting job      |
-| `revising` | admin sent it back (reject + "send back", or an `@Claude` comment) | admin app         |
-| `approved` | scheduled; live once `publish_at` passes                        | admin app         |
-| `rejected` | dropped                                                         | admin app         |
+| `pending`  | drafted, has a slot; **will auto-post at the slot** unless rejected | drafting job      |
+| `revising` | sent back for a rewrite (reject + "send back", or an `@Claude` comment); won't post | admin app |
+| `approved` | approved early by the admin, or auto-published at its slot; live once `publish_at` passes | admin app / DB job |
+| `rejected` | won't post (also used for "Unpublish"); admin can put it back in the queue with a new slot | admin app |
 | `deleted_at` set | soft-deleted (any status); admin can restore or delete permanently | admin app |
 
 ## 2. Where things live
@@ -54,13 +66,13 @@ Public pages re-render every 5 minutes (ISR), so a post appears within ~5 minute
 ## 3. Data model (`supabase/migrations/001_blog_schema.sql`)
 
 - **`blog_posts`** — `slug` (unique, kebab-case), `title`, `summary`, `body_md` (Markdown, raw HTML is escaped on render),
-  `category` (`news|new-model|comparison|event|guide|roundup`), `tags[]`, `status`, `publish_at`,
+  `category` (`news|new-model|comparison|event|guide|roundup`), `tags[]`, `status`, `slot` (`morning|evening`), `publish_at`,
   **`sources` jsonb** `[{title,url,publisher?,accessed_at?}]`, `fact_flags` jsonb `[{claim,note?}]`,
   `related_product` (`paidtwice|slotrecover|mahina|aegistra|kriosityops|beamdrop` or null),
   `reject_reasons[]`, `reject_note`, `reading_minutes`, `approved_at/by`, `deleted_at`, timestamps.
 - **`blog_comments`** — threaded (`parent_id`), `author_kind` `admin|claude`, optional `anchor_text` (the quoted passage),
   `resolved`, `handled_at` (set by the drafting job once it acted on an admin comment).
-- **`blog_post_events`** — audit trail of every action (`drafted, approved, rejected, revision_requested, revised, edited, deleted, restored, unpublished, undo`).
+- **`blog_post_events`** — audit trail of every action (`drafted, approved, auto_published, rejected, revision_requested, revised, slot_changed, requeued, edited, deleted, restored, unpublished, undo`).
 - **`blog_subscribers`** — newsletter sign-ups from the blog pages.
 - **`blog_admins`** — allowlist of admin emails (+ optional pinned `user_id`).
 
@@ -94,7 +106,7 @@ app/
   admin/                  admin web app (client-side, Supabase JS + RLS), noindex
     layout.tsx            AdminShell: session + blog_is_admin() gate
     page.tsx              queue: Pending / Scheduled / Published / Rejected / Deleted
-    posts/[id]/page.tsx   review: read, edit, sources editor, approve (slot picker), reject/send back,
+    posts/[id]/page.tsx   review: read, edit, sources editor, reject/send back, approve early, change slot,
                           delete/restore/permanent delete, comment threads, history
     subscribers/page.tsx  list, remove, CSV export
     account/page.tsx      set password, sign out
@@ -146,7 +158,7 @@ No server secrets are needed by the web app.
 
 Everything is self-contained in the `blog_` tables, so moving is copy-and-paste:
 
-1. New Supabase project → SQL editor → run `supabase/migrations/001_blog_schema.sql`.
+1. New Supabase project → SQL editor → run every file in `supabase/migrations/` in order (001, 002, …). 002 needs the pg_cron extension.
 2. Old project (KriosityOps) → SQL editor → run `supabase/move/export_data.sql`. It returns one cell, `import_sql`.
 3. Copy that cell, run it in the new project's SQL editor.
 4. In Vercel, change `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`, redeploy. Update the drafting job's project ref.
@@ -167,11 +179,11 @@ For large data use the `pg_dump` command in the header of `export_data.sql`.
 ## 10. Status and next steps
 
 Live today (12 Oct 2026): public blog and admin app deployed at kriosity.in/blog.
-**Not yet applied:** the schema in `supabase/migrations/001_blog_schema.sql` still has to be run on the KriosityOps database; until then the blog shows its empty state and admin sign-in fails the admin check.
+**Not yet applied:** `supabase/migrations/001_blog_schema.sql` and `002_slots_autopublish.sql` still have to be run on the KriosityOps database; until then the blog shows its empty state and admin sign-in fails the admin check.
 Not running yet: daily drafting, newsletter sending, Android app (see Next).
 
 Built: schema + RLS (written), public blog (index, posts, references, categories, RSS, sitemap, subscribe),
-admin web app (login, queue, review/edit, approve with slot, reject/send back, comments, delete/restore,
+admin web app (login, queue, review/edit, slots + auto-post unless rejected, reject/send back, comments, delete/restore,
 subscribers, password), drafting brief, move scripts, `/blog` routing from kriosity.in.
 
 Next:

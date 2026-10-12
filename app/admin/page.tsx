@@ -5,9 +5,9 @@ import Link from "next/link";
 import { useAdmin } from "@/components/admin/AdminShell";
 import { QUEUE_TABS, statusChip, type QueueTab } from "@/lib/admin";
 import { categoryLabel, type Post } from "@/lib/types";
-import { formatIST, nextSlot } from "@/lib/slots";
+import { formatIST, nextSlot, SLOT_LABEL, slotOf } from "@/lib/slots";
 
-type Row = Pick<Post, "id" | "slug" | "title" | "summary" | "category" | "status" | "publish_at" | "sources" | "fact_flags" | "reading_minutes" | "deleted_at" | "created_at">;
+type Row = Pick<Post, "id" | "slug" | "title" | "summary" | "category" | "status" | "publish_at" | "slot" | "sources" | "fact_flags" | "reading_minutes" | "deleted_at" | "created_at">;
 
 export default function Queue() {
   const { sb } = useAdmin();
@@ -20,7 +20,7 @@ export default function Queue() {
     setError(null);
     const { data, error } = await sb
       .from("blog_posts")
-      .select("id,slug,title,summary,category,status,publish_at,sources,fact_flags,reading_minutes,deleted_at,created_at")
+      .select("id,slug,title,summary,category,status,publish_at,slot,sources,fact_flags,reading_minutes,deleted_at,created_at")
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) return setError(error.message);
@@ -53,7 +53,7 @@ export default function Queue() {
         <div>
           <small>Today, {today}</small>
           <strong>
-            {counts.pending === 0 ? "Nothing waiting for you" : `${counts.pending} ${counts.pending === 1 ? "draft" : "drafts"} waiting for you`}
+            {counts.pending === 0 ? "Nothing waiting for you" : counts.pending === 1 ? "1 draft will auto-post unless you reject it" : `${counts.pending} drafts will auto-post unless you reject them`}
           </strong>
         </div>
         <span className="a-pill-dark">Next slot {formatIST(nextSlot(), { day: undefined, month: undefined })}</span>
@@ -85,10 +85,20 @@ export default function Queue() {
                   <span className="a-chip">{categoryLabel(p.category)}</span>
                   <span className={`a-chip ${chip.cls}`}>{chip.label}</span>
                   <span className="a-note" style={{ marginLeft: "auto" }}>
-                    {p.publish_at ? formatIST(p.publish_at) : `Drafted ${formatIST(p.created_at)}`}
+                    {p.publish_at
+                      ? `${SLOT_LABEL[p.slot ?? slotOf(p.publish_at)].split(" · ")[0]} · ${formatIST(p.publish_at)}`
+                      : `Drafted ${formatIST(p.created_at)}`}
                   </span>
                 </div>
                 <h3 className="a-serif">{p.title}</h3>
+                {p.status === "pending" && p.publish_at && !p.deleted_at && (
+                  <span className="a-note" style={{ color: "var(--a-pending)", fontWeight: 600 }}>
+                    {p.sources.length === 0
+                      ? "Won't post: no sources"
+                      : `Auto-posts ${formatIST(p.publish_at)} unless you reject it`}
+                  </span>
+                )}
+                {p.status === "revising" && <span className="a-note">With Claude for a rewrite. Gets a new slot when it's back.</span>}
                 {p.summary && <p>{p.summary}</p>}
                 <div className="a-meta">
                   <span>{p.sources.length} {p.sources.length === 1 ? "source" : "sources"}</span>

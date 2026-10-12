@@ -7,7 +7,7 @@ import { useAdmin } from "@/components/admin/AdminShell";
 import { logEvent, statusChip } from "@/lib/admin";
 import { renderMarkdown, readingMinutes } from "@/lib/markdown";
 import { CATEGORIES, REJECT_REASONS, categoryLabel, type Comment, type Post, type Source } from "@/lib/types";
-import { formatIST, fromLocalInput, nextSlot, toLocalInput } from "@/lib/slots";
+import { formatIST, istDate, nextSlot, slotIso, slotOf, SLOT_LABEL, type Slot } from "@/lib/slots";
 import { products } from "@/lib/site";
 
 type Event = { id: number; action: string; actor: string; note: string | null; created_at: string };
@@ -27,7 +27,11 @@ export default function Review() {
   const approveRef = useRef<HTMLDialogElement>(null);
   const rejectRef = useRef<HTMLDialogElement>(null);
   const deleteRef = useRef<HTMLDialogElement>(null);
-  const [publishAt, setPublishAt] = useState(toLocalInput(nextSlot()));
+  const [schedDate, setSchedDate] = useState(istDate(nextSlot()));
+  const [schedSlot, setSchedSlot] = useState<Slot>(slotOf(nextSlot()));
+  const [schedMode, setSchedMode] = useState<"approve" | "move" | "requeue">("approve");
+  const [publishNow, setPublishNow] = useState(false);
+  const [schedError, setSchedError] = useState<string | null>(null);
   const [reasons, setReasons] = useState<string[]>([]);
   const [rejectNote, setRejectNote] = useState("");
   const [sendBack, setSendBack] = useState(true);
@@ -87,9 +91,37 @@ export default function Review() {
     return true;
   }
 
-  async function approve() {
-    const iso = fromLocalInput(publishAt);
-    const ok = await update({ status: "approved", publish_at: iso }, "approved", `publish_at ${iso}`, `Approved — goes live ${formatIST(iso)}`, true);
+  function openSchedule(mode: "approve" | "move" | "requeue") {
+    const p = post!;
+    const future = p.publish_at && new Date(p.publish_at) > new Date();
+    const base = future ? new Date(p.publish_at!) : nextSlot();
+    setSchedDate(istDate(base));
+    setSchedSlot(future && p.slot ? p.slot : slotOf(base));
+    setPublishNow(false);
+    setSchedError(null);
+    setSchedMode(mode);
+    approveRef.current?.showModal();
+  }
+
+  async function saveSchedule() {
+    const iso = publishNow ? new Date().toISOString() : slotIso(schedDate, schedSlot);
+    if (!publishNow && new Date(iso) <= new Date()) {
+      return setSchedError("That slot has already passed. Pick a later date or slot.");
+    }
+    const slot = publishNow ? slotOf(iso) : schedSlot;
+    const when = publishNow ? "now" : `${SLOT_LABEL[slot]}, ${formatIST(iso, { hour: undefined, minute: undefined })}`;
+    const patch: Partial<Post> =
+      schedMode === "approve"
+        ? { status: "approved", publish_at: iso, slot }
+        : schedMode === "requeue"
+          ? { status: "pending", publish_at: iso, slot, reject_reasons: [], reject_note: null }
+          : { publish_at: iso, slot };
+    const action = schedMode === "approve" ? "approved" : schedMode === "requeue" ? "requeued" : "slot_changed";
+    const msg =
+      schedMode === "approve"
+        ? publishNow ? "Approved — publishing now" : `Approved — goes live ${when}`
+        : `Moved to ${when}`;
+    const ok = await update(patch, action, `publish_at ${iso}`, msg, true);
     if (ok) approveRef.current?.close();
   }
 
@@ -300,14 +332,35 @@ export default function Review() {
               </div>
             ) : (
               <div className="a-actions">
-                <button className="a-btn lg" disabled={busy} onClick={() => rejectRef.current?.showModal()}>Reject</button>
-                <button className="a-btn primary lg" disabled={busy || !canApprove} onClick={() => { setPublishAt(toLocalInput(post.publish_at && new Date(post.publish_at) > new Date() ? post.publish_at : nextSlot())); approveRef.current?.showModal(); }}>
-                  {post.status === "approved" ? "Reschedule" : "Approve"}
-                </button>
-                {!canApprove && <p className="a-note full" style={{ margin: 0 }}>Add at least one source to approve.</p>}
+                {post.status === "pending" && post.publish_at && (
+                  <p className="a-note full" style={{ margin: 0 }}>
+                    {canApprove
+                      ? <>Posts automatically <strong>{formatIST(post.publish_at)}</strong> ({SLOT_LABEL[post.slot ?? slotOf(post.publish_at)].split(" · ")[0].toLowerCase()} slot) unless you reject it. Approving early is optional.</>
+                      : <>Won&apos;t post at its slot: it has no sources. Add one, or reject it.</>}
+                  </p>
+                )}
+                {post.status === "rejected" ? (
+                  <button className="a-btn primary full" disabled={busy} onClick={() => openSchedule("requeue")}>Put back in the queue…</button>
+                ) : (
+                  <>
+                    <button className="a-btn lg" disabled={busy || post.status === "revising"} onClick={() => rejectRef.current?.showModal()}>Reject</button>
+                    {post.status === "approved" ? (
+                      <button className="a-btn primary lg" disabled={busy} onClick={() => openSchedule("move")}>Change slot</button>
+                    ) : (
+                      <button className="a-btn primary lg" disabled={busy || !canApprove || post.status === "revising"} onClick={() => openSchedule("approve")}>Approve</button>
+                    )}
+                  </>
+                )}
+                {post.status === "pending" && (
+                  <button className="a-btn full" disabled={busy} onClick={() => openSchedule("move")}>Change slot</button>
+                )}
                 {post.status === "approved" && (
-                  <button className="a-btn full" disabled={busy} onClick={() => update({ status: "pending" }, "unpublished", undefined, "Moved back to Pending", true)}>
-                    Unpublish (back to Pending)
+                  <button
+                    className="a-btn full"
+                    disabled={busy}
+                    onClick={() => update({ status: "rejected", reject_note: "Unpublished by admin" }, "unpublished", undefined, "Unpublished — it won't post again", true)}
+                  >
+                    Unpublish
                   </button>
                 )}
                 <button className="a-btn full" onClick={() => setEditing(true)} disabled={editing}>Edit post</button>
@@ -345,16 +398,34 @@ export default function Review() {
 
       {/* ---------------------------------------------------------------- dialogs */}
       <dialog ref={approveRef} className="a-dialog" aria-labelledby="ap-h">
-        <form method="dialog" className="in" onSubmit={(e) => { e.preventDefault(); approve(); }}>
-          <h2 id="ap-h">Approve and schedule</h2>
+        <form method="dialog" className="in" onSubmit={(e) => { e.preventDefault(); saveSchedule(); }}>
+          <h2 id="ap-h">{schedMode === "approve" ? "Approve" : schedMode === "requeue" ? "Put back in the queue" : "Change slot"}</h2>
           <div className="a-field">
-            <label htmlFor="ap-at">Goes live at (IST)</label>
-            <input id="ap-at" className="a-input" type="datetime-local" required value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
+            <label htmlFor="ap-date">Date</label>
+            <input id="ap-date" className="a-input" type="date" required min={istDate(new Date())} value={schedDate} disabled={publishNow} onChange={(e) => setSchedDate(e.target.value)} />
           </div>
-          <p className="a-note" style={{ margin: 0 }}>Default is the next free slot (9:00 AM or 6:00 PM). Pick a past time to publish right away.</p>
+          <div className="a-chips" role="radiogroup" aria-label="Slot">
+            {(["morning", "evening"] as Slot[]).map((sl) => (
+              <button key={sl} type="button" role="radio" aria-checked={schedSlot === sl} aria-pressed={schedSlot === sl} className="a-chipbtn" disabled={publishNow} onClick={() => setSchedSlot(sl)}>
+                {SLOT_LABEL[sl]}
+              </button>
+            ))}
+          </div>
+          {schedMode === "approve" && (
+            <label className="a-switch">
+              <input type="checkbox" checked={publishNow} onChange={(e) => setPublishNow(e.target.checked)} />
+              <span><strong style={{ display: "block" }}>Publish now instead</strong><span className="a-note">Goes live within about 5 minutes</span></span>
+            </label>
+          )}
+          <p className="a-note" style={{ margin: 0 }}>
+            {schedMode === "approve"
+              ? "Approving is optional: drafts post at their slot anyway unless rejected."
+              : "It will post automatically at this slot unless you reject it."}
+          </p>
+          {schedError && <div className="a-error" role="alert">{schedError}</div>}
           <div className="a-actions">
             <button type="button" className="a-btn lg" onClick={() => approveRef.current?.close()}>Cancel</button>
-            <button className="a-btn primary lg" disabled={busy}>Approve</button>
+            <button className="a-btn primary lg" disabled={busy}>{schedMode === "approve" ? "Approve" : "Save"}</button>
           </div>
         </form>
       </dialog>
@@ -362,7 +433,7 @@ export default function Review() {
       <dialog ref={rejectRef} className="a-dialog" aria-labelledby="rj-h">
         <form method="dialog" className="in" onSubmit={(e) => { e.preventDefault(); reject(); }}>
           <h2 id="rj-h">Reject this draft?</h2>
-          <p className="a-note" style={{ margin: 0 }}>Your reason guides the next drafts. Pick all that apply.</p>
+          <p className="a-note" style={{ margin: 0 }}>Rejecting is the only way to stop a draft posting at its slot. Your reason guides the next drafts — pick all that apply.</p>
           <div className="a-chips" role="group" aria-label="Reasons">
             {REJECT_REASONS.map((r) => (
               <button key={r} type="button" className="a-chipbtn" aria-pressed={reasons.includes(r)} onClick={() => setReasons(reasons.includes(r) ? reasons.filter((x) => x !== r) : [...reasons, r])}>
@@ -378,7 +449,7 @@ export default function Review() {
             <input type="checkbox" checked={sendBack} onChange={(e) => setSendBack(e.target.checked)} />
             <span>
               <strong style={{ display: "block" }}>Send back for a rewrite</strong>
-              <span className="a-note">Claude revises it and puts it back in Pending</span>
+              <span className="a-note">It won&apos;t post at this slot. Claude rewrites it and gives it a new slot.</span>
             </span>
           </label>
           <div className="a-actions">

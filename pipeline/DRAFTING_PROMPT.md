@@ -2,8 +2,12 @@
 
 This file is the complete brief for whoever drafts posts (today a Claude scheduled task;
 any other AI or person can follow it unchanged). Run once a day around 05:30 IST.
-The job **never publishes**. It only writes rows with `status = 'pending'`; a human admin
-approves them in the admin app (kriosity.in/blog/admin).
+The job itself never publishes. It writes rows with `status = 'pending'` and a **slot**.
+At the slot time a database job (`blog_publish_due`, 09:00 and 18:00 IST) publishes every
+pending draft that is due — **unless the admin rejected it** in the admin app
+(kriosity.in/blog/admin). Rejected, sent-back (`revising`), deleted and source-less drafts never post.
+So every draft you write may go live without anyone reading it first: accuracy and sourcing
+matter more than volume. If you are unsure about a post, don't write it.
 
 Database: Supabase project in `README.md` → "Where things live". Write with SQL as the
 service role (Supabase MCP `execute_sql`, or `psql` with the DB connection string).
@@ -15,14 +19,15 @@ service role (Supabase MCP `execute_sql`, or `psql` with the DB connection strin
 1. **Revisions.** For every post with `status = 'revising'`:
    read `reject_reasons`, `reject_note` and all comments where `author_kind = 'admin'`
    and `handled_at is null`. Rewrite the post to address them, then
-   `update blog_posts set body_md=…, title=…, sources=…, fact_flags=…, status='pending', reject_reasons='{}', reject_note=null`.
+   `update blog_posts set body_md=…, title=…, sources=…, fact_flags=…, status='pending', reject_reasons='{}', reject_note=null, slot=…, publish_at=…`
+   with a **new slot** (see §5): the next free slot that is at least 2 hours away, so the admin has time to look.
 2. **Comments on any post** (`author_kind='admin' and handled_at is null`):
    - If it asks for a change (mentions @Claude or is clearly an instruction), make the change.
    - Reply with one short comment: `insert into blog_comments (post_id, parent_id, author_kind, body) values (…, <root comment id>, 'claude', '<what you changed, or why not>')`.
    - Mark handled: `update blog_comments set handled_at = now() where id = …`.
 3. Log each action: `insert into blog_post_events (post_id, action, actor, note) values (…, 'revised', 'claude', …)`.
 
-## 2. Pick today's topics (2 posts, plus a roundup on Sundays)
+## 2. Pick today's topics (2 posts: one morning, one evening)
 
 Check what is already covered so you don't repeat it:
 `select title, slug, category, created_at from blog_posts where created_at > now() - interval '30 days' and deleted_at is null;`
@@ -36,7 +41,7 @@ Prefer topics where Kriosity can add something beyond the news itself:
 - **Comparisons** that explain real differences (pricing in ₹, context limits, Indian-language support, latency from India). Never invent benchmark scores; cite them.
 - **"What it means for teams in India"** angles.
 - **Practical guides** ("use model X for Y").
-- **Roundup** (Sundays only): "This week in AI" — 6–10 items, one paragraph each, each with its source.
+- **Roundup** (Sundays only, takes the evening slot): "This week in AI" — 6–10 items, one paragraph each, each with its source.
 
 Skip: rumours without a primary source, pure rewrites of one article, anything you can't source.
 
@@ -76,14 +81,20 @@ Skip: rumours without a primary source, pure rewrites of one article, anything y
 ## 5. Insert
 
 ```sql
-insert into blog_posts (slug, title, summary, body_md, category, tags, sources, fact_flags, related_product, reading_minutes, status, drafted_by)
+insert into blog_posts (slug, title, summary, body_md, category, tags, sources, fact_flags, related_product, reading_minutes, status, drafted_by, slot, publish_at)
 values ('…', '…', '…', $md$…markdown…$md$, 'comparison', '{qwen,gpt,claude}',
         '[{"title":"…","url":"https://…","publisher":"…","accessed_at":"2026-10-12"}]'::jsonb,
-        '[]'::jsonb, null, 6, 'pending', 'claude');
+        '[]'::jsonb, null, 6, 'pending', 'claude', 'morning', '2026-10-12 09:00:00+05:30');
 insert into blog_post_events (post_id, action, actor, note) values (<new id>, 'drafted', 'claude', null);
 ```
 
-Leave `publish_at` empty — the admin picks the slot (9:00 AM / 6:00 PM IST) when approving.
+Every draft gets a slot when inserted. Slots are fixed: **morning = 09:00 IST** (`03:30 UTC`),
+**evening = 18:00 IST** (`12:30 UTC`).
+- Today's first post → `slot='morning'`, `publish_at = today 09:00 IST`.
+- Today's second post (Sundays: the roundup) → `slot='evening'`, `publish_at = today 18:00 IST`.
+- A slot is *free* if no other non-deleted post with status `pending` or `approved` already has that `publish_at`.
+  If today's slot is taken (or less than 2 hours away, e.g. a late run), use the next free slot.
+- Add the slot to the insert: `…, slot, publish_at) values (…, 'morning', '2026-10-12 09:00:00+05:30')`.
 
 ## 6. Finish
 

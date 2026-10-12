@@ -8,3 +8,5 @@ drop table if exists public.blog_admins cascade;
 drop function if exists public.blog_is_admin();
 drop function if exists public.blog_sources_valid(jsonb);
 drop function if exists public.blog_touch();
+drop function if exists public.blog_publish_due();
+select cron.unschedule(jobid) from cron.job where jobname in ('blog-publish-morning', 'blog-publish-evening');

@@ -19,13 +19,16 @@ below against the same database. **When in doubt, match the web admin's behaviou
 1. Sign in (admin only).
 2. See the queue of drafts waiting for review.
 3. Read a draft, its sources and any fact-check flags.
-4. Approve it into a publishing slot, or reject / send it back to Claude for a rewrite.
+4. **Reject** it (the only way to stop it posting), send it back to Claude for a rewrite, move it to another slot, or approve it early (optional).
 5. Comment on a passage or the whole post, reply, resolve; `@Claude` asks for a change.
 6. See the publishing schedule; undo recent actions.
 7. Edit, delete, restore posts (secondary; can link out to the web admin in v1).
 
-The app **never** publishes by itself. A post goes live when `status = 'approved'` and
-`publish_at <= now()`; the public site picks it up within ~5 minutes.
+**Publishing rule (important):** every draft has a fixed **slot** — morning (09:00 IST) or evening
+(18:00 IST). At the slot time a database job publishes it automatically **unless the admin rejected it**.
+Approving is optional. Never auto-posted: rejected, sent back for a rewrite (`revising`), deleted, or with no
+sources. The app itself never publishes; it only changes status/slot. The public site shows a post within ~5
+minutes of its slot.
 
 ## 2. Tech recommendation
 
@@ -104,9 +107,9 @@ Lockups: mark + "kriosity" (sign-in, white on ink); mark + "kriosity" + divider 
 
 ## 4. Components
 
-- **Status chip** — pill, 12 sp/600, 4×10 dp padding. Variants: category (indigo-soft/indigo), Needs review & Claude revising (pending), Scheduled (approved), Published (ink bg, white text), Rejected (rejected), Deleted (`#EEF0F3` / body).
-- **Draft card** — surface, 1 dp line border, radius 16, padding 16. Row 1: category chip, status chip, time on the right (muted 12 sp). Title (Newsreader 21). Optional summary (14/20, body colour, max 2 lines). Meta row: link icon + "N sources", clock + "N min read", then either amber triangle "N flags", green check "Facts checked", or amber "No sources — can't be approved". Whole card taps to the reader.
-- **Summary banner** — ink, radius 16: "Today, Mon 12 Oct" (13, `#C9CBD3`) over "N drafts waiting for you" (17/600, white); right: indigo pill "Next slot 6:00 PM".
+- **Status chip** — pill, 12 sp/600, 4×10 dp padding. Variants: category (indigo-soft/indigo), Needs review & Claude revising (pending), Scheduled (approved early), Published (ink bg, white text), Rejected (rejected), Deleted (`#EEF0F3` / body).
+- **Draft card** — surface, 1 dp line border, radius 16, padding 16. Row 1: category chip, status chip, time on the right (muted 12 sp). Title (Newsreader 21). Optional summary (14/20, body colour, max 2 lines). Meta row: link icon + "N sources", clock + "N min read", then either amber triangle "N flags", green check "Facts checked", or amber "No sources — won't post". Under the title on pending drafts: slot line in pending colour, e.g. "Morning · auto-posts 9:00 AM unless you reject it". Whole card taps to the reader.
+- **Summary banner** — ink, radius 16: "Today, Mon 12 Oct" (13, `#C9CBD3`) over "N drafts will auto-post unless you reject them" (17/600, white); right: indigo pill "Next slot 6:00 PM".
 - **Tabs** — text tabs with 3 dp indigo underline on the active one; inactive muted 500. Labels include counts: "Pending 2".
 - **Bottom navigation** — 4 items: Queue, Schedule, Comments, Stats. Active item has a 56×30 indigo-soft pill behind the icon and indigo label; others muted.
 - **Buttons** — Primary (indigo fill, white), Secondary (white, 1.5 dp line-strong border, ink text), Destructive (danger fill), Text (indigo, no border), Icon (44 dp circle, transparent).
@@ -129,8 +132,8 @@ Lockups: mark + "kriosity" (sign-in, white on ink); mark + "kriosity" + divider 
 - App bar (white, bottom border): logo lockup "kriosity | blog admin", title "Review queue", icon buttons Search and Notifications (dot badge when new drafts).
 - Summary banner (§4).
 - Tabs: Pending · Scheduled · Published · Rejected · Deleted (web admin uses the same five).
-- List of draft cards. Below the list on Pending: divider text "Swipe right to approve · left to reject". Dashed card "Weekly roundup drafts on Sunday — This week in AI · <dates>".
-- **Swipe right** → Approve sheet (§ approve). **Swipe left** → Reject sheet. Pull to refresh.
+- List of draft cards. Below the list on Pending: divider text "Swipe left to reject · right to approve early". Dashed card "Weekly roundup drafts on Sunday — This week in AI · <dates>".
+- **Swipe left** → Reject sheet (primary gesture). **Swipe right** → approve early (optional). Pull to refresh.
 - Empty state (Pending): "No drafts waiting. New ones arrive each morning."
 - Bottom nav.
 
@@ -140,19 +143,24 @@ Lockups: mark + "kriosity" (sign-in, white on ink); mark + "kriosity" + divider 
 - Title (Newsreader 28), meta "Drafted 5:42 AM · 1,480 words · scheduled 6:00 PM".
 - Fact-check banner if `fact_flags` not empty; "Claude is revising this post" banner if status `revising`; "Your last feedback" banner if `reject_note`.
 - Body rendered from Markdown in Newsreader 18/29. Long-press a passage → highlight (flag bg) → "Comment on this".
-- Sources strip above the action bar: "Sources · N linked · View" → bottom sheet listing each source (title as link, publisher, accessed date). If 0 sources: amber "No sources — add one before approving" and Approve disabled.
-- Sticky action bar: **Reject** (secondary, X icon) | **Approve** (primary, check icon); full-width text button "Ask Claude to revise…" (opens composer prefilled with "@Claude ").
+- Sources strip above the action bar: "Sources · N linked · View" → bottom sheet listing each source (title as link, publisher, accessed date). If 0 sources: amber "No sources — this won't post. Add one or reject it." and Approve disabled.
+- Line above the action bar on pending drafts: "Posts automatically Mon 12 Oct, 9:00 AM (morning slot) unless you reject it."
+- Sticky action bar: **Reject** (secondary, X icon) | **Approve** (primary, check icon; optional); full-width secondary "Change slot"; text button "Ask Claude to revise…" (opens composer prefilled with "@Claude "). Approved posts: "Change slot" + "Unpublish". Rejected posts: "Put back in the queue…" (pick a new slot).
 - Swipe horizontally between drafts in the current tab.
 
-### Approve sheet (not drawn separately; mirrors web)
-- Title "Approve and schedule", date-time picker in IST, default = next slot (09:00 or 18:00 IST, at least 15 min ahead), helper "Pick a past time to publish right away". Cancel / Approve. On success → snackbar "Approved — goes live 6:00 PM" with UNDO.
+### Slot sheet: Approve / Change slot / Put back in the queue (not drawn separately; mirrors web)
+- One sheet, three titles. Fields: **Date** (IST, today or later) and **slot** as two chips: "Morning · 9:00 AM", "Evening · 6:00 PM". Default = the post's current slot if still ahead, else the next slot at least 15 min away.
+- Approve mode adds a toggle "Publish now instead" (goes live within ~5 min).
+- A slot that has already passed is refused: "That slot has already passed. Pick a later date or slot."
+- Helper: "Approving is optional: drafts post at their slot anyway unless rejected."
+- Writes: Approve → `status='approved', slot, publish_at`; Change slot → `slot, publish_at`; Put back → `status='pending', slot, publish_at, reject_reasons='{}', reject_note=null`. Snackbar with UNDO.
 
 ### 03 Reject sheet
 - Modal bottom sheet over a dimmed reader (scrim `#5F6270`), drag handle.
-- "Reject this draft?" + "Your reason trains the next drafts. Pick all that apply."
+- "Reject this draft?" + "Rejecting is the only way to stop a draft posting at its slot. Your reason guides the next drafts — pick all that apply."
 - Reason chips (multi-select): Factual error · Weak or missing sources · Already covered · Off-brand tone · Not useful · Other (same list as `REJECT_REASONS` in `lib/types.ts`).
 - "Note for Claude (optional)" multiline field.
-- Toggle row "Send back for a rewrite — Claude revises and re-queues it" (default ON).
+- Toggle row "Send back for a rewrite — It won't post at this slot. Claude rewrites it and gives it a new slot." (default ON).
 - Cancel (secondary) | **Reject** / **Send back** (danger). Snackbar with UNDO.
 
 ### 04 Comments & replies
@@ -166,9 +174,9 @@ Lockups: mark + "kriosity" (sign-in, white on ink); mark + "kriosity" + divider 
 ### 05 Schedule
 - Title "Schedule", "Slots" button (shows slot times; v1 read-only: 9:00 AM and 6:00 PM IST).
 - Week strip: 7 day buttons (60 dp tall, radius 14), selected = ink fill.
-- Timeline for the selected day: 5:30 AM "Claude drafted N posts" (green dot) → each slot with its post card: Published (green), Waiting for approval (indigo ring, indigo 2 dp card border, note "Suggested: approve before 5:45 PM for this slot" (see slot rules below)), empty slot ("Open — approve a draft into it"). Sunday shows the weekly roundup.
+- Timeline for the selected day: 5:30 AM "Claude drafted N posts" (green dot) → each slot with its post card: Published (green), Will auto-post (indigo ring, indigo 2 dp card border, note "Posts at 6:00 PM unless you reject it"), Rejected (struck, muted: "Won't post"), empty slot ("Empty — nothing scheduled"). Sunday shows the weekly roundup.
 - Snackbar example: "Approved — goes live at 6:00 PM · UNDO".
-- **Slot rules (same as `lib/slots.ts`; there is no other cutoff):** slots are 09:00 and 18:00 IST. The approve picker defaults to the next slot at least 15 minutes ahead, so a draft approved after 17:45 defaults to 09:00 next day. The admin can override with any time; a past time publishes immediately. Nothing is ever skipped or published automatically: a slot with no approved post simply stays empty, and an unapproved draft stays in Pending.
+- **Slot rules:** two fixed slots, 09:00 and 18:00 IST. Each draft is given one when it is drafted (post 1 → morning, post 2 → evening; Sundays the roundup takes the evening). At each slot a DB job (`blog_publish_due()`, pg_cron 03:30 and 12:30 UTC) publishes every pending draft whose time has come and that has sources. **There is no approval deadline: if you do nothing, it posts. To stop it, reject it before the slot.** A sent-back draft gets a new slot after the rewrite, at least 2 hours away.
 
 ### Stats (bottom nav, v2)
 Placeholder for now: posts published this week, pending count, subscribers count (`blog_subscribers`). Don't invent page-view numbers; there's no analytics source yet.
@@ -177,15 +185,18 @@ Placeholder for now: posts published this week, pending count, subscribers count
 
 | UI | Query / write |
 |---|---|
-| Queue lists | `select id,slug,title,summary,category,status,publish_at,sources,fact_flags,reading_minutes,deleted_at,created_at from blog_posts order by created_at desc` then bucket: Deleted = `deleted_at not null`; Pending = `status in (pending, revising)`; Rejected = `rejected`; Scheduled = `approved` and `publish_at > now()`; Published = `approved` and `publish_at <= now()` |
+| Queue lists | `select id,slug,title,summary,category,status,publish_at,slot,sources,fact_flags,reading_minutes,deleted_at,created_at from blog_posts order by created_at desc` then bucket: Deleted = `deleted_at not null`; Pending = `status in (pending, revising)`; Rejected = `rejected`; Scheduled = `approved` and `publish_at > now()`; Published = `approved` and `publish_at <= now()` |
 | Reader | `select * from blog_posts where id = :id` |
-| Approve | `update blog_posts set status='approved', publish_at=:ts where id=:id` (DB rejects if no sources) |
+| Approve (optional) | `update blog_posts set status='approved', slot=:slot, publish_at=:ts where id=:id` (DB rejects if no sources) |
+| Change slot | `update … set slot=:slot, publish_at=:ts` |
+| Unpublish | `update … set status='rejected', reject_note='Unpublished by admin'` (not back to pending — pending would auto-post again) |
+| Put back in queue | `update … set status='pending', slot, publish_at, reject_reasons='{}', reject_note=null` |
 | Reject / send back | `update … set status = 'rejected' or 'revising', reject_reasons = :arr, reject_note = :note` |
 | Undo | before the write, snapshot the current value of **every field the action changes** (plus `approved_at`, `approved_by` when `status` changes); UNDO writes that snapshot back and logs an `undo` event. E.g. undoing a reject restores `status`, `reject_reasons` and `reject_note`; undoing an approve restores `status`, `publish_at` and the approval stamps. Same as `update(…, undoable)` in `app/admin/posts/[id]/page.tsx` |
 | Delete / restore | `update … set deleted_at = now()` / `null`; permanent: `delete from blog_posts where id=:id` (only from Deleted tab, with confirm) |
 | Comments | `select * from blog_comments where post_id=:id order by created_at`; insert `{post_id, parent_id, author_kind:'admin', author_id: auth.uid, body, anchor_text}`; resolve: `update set resolved = not resolved` |
 | `@Claude` in a comment | also set the post's `status='revising'` if it was `pending` or `rejected` (web does the same) |
-| Audit | after every admin action insert `blog_post_events {post_id, action, actor:'admin:<email>', note}` — actions: approved, rejected, revision_requested, edited, deleted, restored, unpublished, undo |
+| Audit | after every admin action insert `blog_post_events {post_id, action, actor:'admin:<email>', note}` — actions: approved, rejected, revision_requested, slot_changed, requeued, edited, deleted, restored, unpublished, undo (the DB job logs `auto_published` with actor `system`) |
 | Admin check | `rpc('blog_is_admin')` → boolean |
 
 Types and field meanings: `lib/types.ts` and README §3. Times are stored UTC; always display in **Asia/Kolkata**.
@@ -200,9 +211,10 @@ following README §9. Until then, the app refreshes on open and on pull.
 ## 8. Acceptance checklist
 
 - [ ] Non-admin accounts can't see any data (RLS) and get the "not an admin" screen.
+- [ ] Every pending draft shows its slot and "auto-posts unless you reject it"; rejecting is reachable in one gesture (swipe left).
 - [ ] Approve is impossible with zero sources; the error is shown in plain words.
 - [ ] Every approve/reject/delete has UNDO for 6 s and writes a `blog_post_events` row.
-- [ ] All times shown in IST; default approve time is the next slot.
+- [ ] All times shown in IST; slot sheet defaults to the post's own slot, refuses past slots.
 - [ ] Text scales with system font size up to 200% without clipping; TalkBack labels on icon buttons.
 - [ ] Dark mode: not required for v1; lock to light theme.
 - [ ] No secrets in the APK beyond the publishable key.
