@@ -166,7 +166,7 @@ Lockups: mark + "kriosity" (sign-in, white on ink); mark + "kriosity" + divider 
 ### 05 Schedule
 - Title "Schedule", "Slots" button (shows slot times; v1 read-only: 9:00 AM and 6:00 PM IST).
 - Week strip: 7 day buttons (60 dp tall, radius 14), selected = ink fill.
-- Timeline for the selected day: 5:30 AM "Claude drafted N posts" (green dot) → each slot with its post card: Published (green), Waiting for approval (indigo ring, indigo 2 dp card border, note "Approve by 5:45 PM to make this slot" (see slot rules below)), empty slot ("Open — approve a draft into it"). Sunday shows the weekly roundup.
+- Timeline for the selected day: 5:30 AM "Claude drafted N posts" (green dot) → each slot with its post card: Published (green), Waiting for approval (indigo ring, indigo 2 dp card border, note "Suggested: approve before 5:45 PM for this slot" (see slot rules below)), empty slot ("Open — approve a draft into it"). Sunday shows the weekly roundup.
 - Snackbar example: "Approved — goes live at 6:00 PM · UNDO".
 - **Slot rules (same as `lib/slots.ts`; there is no other cutoff):** slots are 09:00 and 18:00 IST. The approve picker defaults to the next slot at least 15 minutes ahead, so a draft approved after 17:45 defaults to 09:00 next day. The admin can override with any time; a past time publishes immediately. Nothing is ever skipped or published automatically: a slot with no approved post simply stays empty, and an unapproved draft stays in Pending.
 

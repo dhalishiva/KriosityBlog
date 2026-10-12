@@ -3,7 +3,7 @@
 The blog at **https://kriosity.in/blog**: hands-on AI coverage (new models, comparisons, events,
 guides, a weekly roundup) for developers, founders and IT teams, especially in India.
 
-Posts are **drafted automatically by an AI** every morning and **published only after a human
+Posts are **drafted by an AI** (planned: every morning at 05:30 IST — see §10 for what is running today) and **published only after a human
 approves them** in the admin app at **https://kriosity.in/blog/admin**. Every post must list the
 sources its facts come from; the database enforces this.
 
