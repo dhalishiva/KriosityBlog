@@ -43,6 +43,7 @@ export type Post = {
   reject_note: string | null;
   drafted_by: string;
   approved_at: string | null;
+  approved_by: string | null;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;

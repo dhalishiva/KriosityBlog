@@ -166,7 +166,11 @@ For large data use the `pg_dump` command in the header of `export_data.sql`.
 
 ## 10. Status and next steps
 
-Done: schema + RLS, public blog (index, posts, references, categories, RSS, sitemap, subscribe),
+Live today (12 Oct 2026): public blog and admin app deployed at kriosity.in/blog.
+**Not yet applied:** the schema in `supabase/migrations/001_blog_schema.sql` still has to be run on the KriosityOps database; until then the blog shows its empty state and admin sign-in fails the admin check.
+Not running yet: daily drafting, newsletter sending, Android app (see Next).
+
+Built: schema + RLS (written), public blog (index, posts, references, categories, RSS, sitemap, subscribe),
 admin web app (login, queue, review/edit, approve with slot, reject/send back, comments, delete/restore,
 subscribers, password), drafting brief, move scripts, `/blog` routing from kriosity.in.
 

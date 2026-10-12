@@ -166,8 +166,9 @@ Lockups: mark + "kriosity" (sign-in, white on ink); mark + "kriosity" + divider 
 ### 05 Schedule
 - Title "Schedule", "Slots" button (shows slot times; v1 read-only: 9:00 AM and 6:00 PM IST).
 - Week strip: 7 day buttons (60 dp tall, radius 14), selected = ink fill.
-- Timeline for the selected day: 5:30 AM "Claude drafted N posts" (green dot) → each slot with its post card: Published (green), Waiting for approval (indigo ring, indigo 2 dp card border, note "If not approved by 5:30 PM, the slot is skipped"), empty slot ("Open — approve a draft into it"). Sunday shows the weekly roundup.
+- Timeline for the selected day: 5:30 AM "Claude drafted N posts" (green dot) → each slot with its post card: Published (green), Waiting for approval (indigo ring, indigo 2 dp card border, note "Approve by 5:45 PM to make this slot" (see slot rules below)), empty slot ("Open — approve a draft into it"). Sunday shows the weekly roundup.
 - Snackbar example: "Approved — goes live at 6:00 PM · UNDO".
+- **Slot rules (same as `lib/slots.ts`; there is no other cutoff):** slots are 09:00 and 18:00 IST. The approve picker defaults to the next slot at least 15 minutes ahead, so a draft approved after 17:45 defaults to 09:00 next day. The admin can override with any time; a past time publishes immediately. Nothing is ever skipped or published automatically: a slot with no approved post simply stays empty, and an unapproved draft stays in Pending.
 
 ### Stats (bottom nav, v2)
 Placeholder for now: posts published this week, pending count, subscribers count (`blog_subscribers`). Don't invent page-view numbers; there's no analytics source yet.
@@ -180,7 +181,7 @@ Placeholder for now: posts published this week, pending count, subscribers count
 | Reader | `select * from blog_posts where id = :id` |
 | Approve | `update blog_posts set status='approved', publish_at=:ts where id=:id` (DB rejects if no sources) |
 | Reject / send back | `update … set status = 'rejected' or 'revising', reject_reasons = :arr, reject_note = :note` |
-| Undo | write the previous `status` (and `deleted_at`) back |
+| Undo | before the write, snapshot the current value of **every field the action changes** (plus `approved_at`, `approved_by` when `status` changes); UNDO writes that snapshot back and logs an `undo` event. E.g. undoing a reject restores `status`, `reject_reasons` and `reject_note`; undoing an approve restores `status`, `publish_at` and the approval stamps. Same as `update(…, undoable)` in `app/admin/posts/[id]/page.tsx` |
 | Delete / restore | `update … set deleted_at = now()` / `null`; permanent: `delete from blog_posts where id=:id` (only from Deleted tab, with confirm) |
 | Comments | `select * from blog_comments where post_id=:id order by created_at`; insert `{post_id, parent_id, author_kind:'admin', author_id: auth.uid, body, anchor_text}`; resolve: `update set resolved = not resolved` |
 | `@Claude` in a comment | also set the post's `status='revising'` if it was `pending` or `rejected` (web does the same) |

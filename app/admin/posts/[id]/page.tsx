@@ -56,7 +56,13 @@ export default function Review() {
   const chip = statusChip(post);
   const canApprove = post.sources.length > 0 && !post.deleted_at;
 
-  async function update(patch: Partial<Post>, action: string, note?: string, msg?: string, undoPatch?: Partial<Post>) {
+  /**
+   * Write a change to the post. With `undoable`, the toast offers UNDO, which restores
+   * every field this change touched (plus approval stamps when status changes) to the
+   * exact values they had before — not just the status.
+   */
+  async function update(patch: Partial<Post>, action: string, note?: string, msg?: string, undoable = false) {
+    const before = post!;
     setBusy(true);
     setError(null);
     const { data, error } = await sb.from("blog_posts").update(patch).eq("id", id).select("*").single();
@@ -69,13 +75,21 @@ export default function Review() {
     setDraft(data as Post);
     await logEvent(sb, id, action, email, note);
     load();
-    if (msg) toast(msg, undoPatch ? () => update(undoPatch, "undo", action) : undefined);
+    if (msg) {
+      let restore: Partial<Post> | undefined;
+      if (undoable) {
+        const keys = Object.keys(patch) as (keyof Post)[];
+        if ("status" in patch) keys.push("approved_at", "approved_by");
+        restore = Object.fromEntries(keys.map((k) => [k, before[k]])) as Partial<Post>;
+      }
+      toast(msg, restore ? () => update(restore!, "undo", action) : undefined);
+    }
     return true;
   }
 
   async function approve() {
     const iso = fromLocalInput(publishAt);
-    const ok = await update({ status: "approved", publish_at: iso }, "approved", `publish_at ${iso}`, `Approved — goes live ${formatIST(iso)}`, { status: "pending" });
+    const ok = await update({ status: "approved", publish_at: iso }, "approved", `publish_at ${iso}`, `Approved — goes live ${formatIST(iso)}`, true);
     if (ok) approveRef.current?.close();
   }
 
@@ -86,7 +100,7 @@ export default function Review() {
       sendBack ? "revision_requested" : "rejected",
       [reasons.join(", "), rejectNote].filter(Boolean).join(" — "),
       sendBack ? "Sent back to Claude for a rewrite" : "Rejected",
-      { status: post!.status },
+      true,
     );
     if (ok) {
       rejectRef.current?.close();
@@ -96,7 +110,7 @@ export default function Review() {
   }
 
   async function softDelete() {
-    const ok = await update({ deleted_at: new Date().toISOString() }, "deleted", undefined, "Moved to Deleted", { deleted_at: null });
+    const ok = await update({ deleted_at: new Date().toISOString() }, "deleted", undefined, "Moved to Deleted", true);
     if (ok) deleteRef.current?.close();
   }
 
@@ -281,7 +295,7 @@ export default function Review() {
             <h2 id="act-h">Decision</h2>
             {post.deleted_at ? (
               <div className="a-actions">
-                <button className="a-btn primary full" disabled={busy} onClick={() => update({ deleted_at: null }, "restored", undefined, "Restored")}>Restore</button>
+                <button className="a-btn primary full" disabled={busy} onClick={() => update({ deleted_at: null }, "restored", undefined, "Restored", true)}>Restore</button>
                 <button className="a-btn danger full" disabled={busy} onClick={() => deleteRef.current?.showModal()}>Delete permanently…</button>
               </div>
             ) : (
@@ -292,7 +306,7 @@ export default function Review() {
                 </button>
                 {!canApprove && <p className="a-note full" style={{ margin: 0 }}>Add at least one source to approve.</p>}
                 {post.status === "approved" && (
-                  <button className="a-btn full" disabled={busy} onClick={() => update({ status: "pending" }, "unpublished", undefined, "Moved back to Pending", { status: "approved" })}>
+                  <button className="a-btn full" disabled={busy} onClick={() => update({ status: "pending" }, "unpublished", undefined, "Moved back to Pending", true)}>
                     Unpublish (back to Pending)
                   </button>
                 )}
