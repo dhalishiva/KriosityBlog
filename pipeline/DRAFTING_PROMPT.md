@@ -60,6 +60,10 @@ Skip: rumours without a primary source, pure rewrites of one article, anything y
 - Do **not** write a "References" or "Sources" section in `body_md`; the site renders it from `sources`.
 - If a claim has only one weak source, or you couldn't verify it, keep it out — or keep it and add it to
   `fact_flags`: `[{"claim":"…","note":"only one source / couldn't open the page / etc."}]`. The admin sees flags in amber.
+- **Model releases: always open the model card** (Hugging Face or the vendor's model page) as well as the announcement. Licence, context length, parameter counts and inputs are usually only there. Don't write "not stated" until you've checked it.
+- **When two sources disagree** (even two pages from the same vendor), say so in the post with both figures and both links, and add a fact flag. Never silently pick one.
+- Don't add details you can't point to on a page you opened (architecture lineage, "distilled from", hardware specifics). Leave them out rather than flag them.
+- Customer quotes in vendor posts are often expectations ("expects up to 50%…"). Report them with the vendor's own verb.
 - Quote sparingly: at most one short quote (under 15 words) per source. Everything else in your own words.
 - Never copy an article's structure or paragraphs. Write an original piece that adds analysis.
 
