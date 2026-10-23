@@ -2,7 +2,7 @@ import { publicClient } from "./supabase";
 import type { Post } from "./types";
 
 const PUBLIC_COLS =
-  "id,slug,title,summary,body_md,category,tags,status,publish_at,sources,related_product,cover_image_url,reading_minutes,updated_at,created_at";
+  "id,slug,title,seo_title,summary,body_md,category,tags,status,publish_at,sources,related_product,cover_image_url,reading_minutes,updated_at,created_at";
 
 /** Live posts only (RLS also enforces this: approved, not deleted, publish_at in the past). */
 export async function listPublished(category?: string, limit = 60): Promise<Post[]> {

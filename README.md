@@ -65,7 +65,7 @@ appears within ~5 minutes of its slot.
 
 ## 3. Data model (`supabase/migrations/001_blog_schema.sql`)
 
-- **`blog_posts`** — `slug` (unique, kebab-case), `title`, `summary`, `body_md` (Markdown, raw HTML is escaped on render),
+- **`blog_posts`** — `slug` (unique, kebab-case), `title` (the H1), `seo_title` (≤60 chars, only for `<title>`), `summary`, `body_md` (Markdown, raw HTML is escaped on render),
   `category` (`news|new-model|comparison|event|guide|roundup`), `tags[]`, `status`, `slot` (`morning|evening`), `publish_at`,
   **`sources` jsonb** `[{title,url,publisher?,accessed_at?}]`, `fact_flags` jsonb `[{claim,note?}]`,
   `related_product` (`paidtwice|slotrecover|mahina|aegistra|kriosityops|beamdrop` or null),
@@ -82,6 +82,11 @@ appears within ~5 minutes of its slot.
 - RLS: the public (anon key) can only read live posts and insert subscribers. Everything else requires
   `blog_is_admin()` = signed in, email verified, email listed in `blog_admins`.
 - The drafting job writes with the service role / SQL editor, which bypasses RLS.
+
+### Search titles, descriptions and IndexNow
+- `<title>`: `seo_title` if set, else `title`, via `postTitle()` in `lib/seo.ts`. The " | Kriosity Blog" suffix is kept only when the whole title fits in 70 characters; otherwise it's dropped, and a still-too-long title is cut at a natural break or whole word (no "…"). The H1, URL, og:title, twitter:title, JSON-LD and RSS always use the full `title`.
+- Meta description: `summary`, cut to ≤160 characters the same way (`metaDescription()`); og:description keeps the full summary.
+- IndexNow (migration 004): when a post becomes live, the database pings `api.indexnow.org` once with the post URL, `/blog` and `/blog/sitemap.xml`, using the kriosity.in key. It uses pg_net, so it never blocks publishing. `blog_posts.indexnow_pinged_at` marks posts already announced, and is cleared if a post stops being live. Attempts are logged in `blog_indexnow_log`; HTTP results are in the `blog_indexnow_status` view (SQL editor). Cron `blog-indexnow-morning/evening` (09:01 / 18:01 IST) catches posts approved early whose slot simply arrives.
 
 ## 4. Sourcing policy (non-negotiable)
 

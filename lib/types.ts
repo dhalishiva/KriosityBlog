@@ -28,6 +28,8 @@ export type Post = {
   id: string;
   slug: string;
   title: string;
+  /** Short title for search results (≤60 chars). Used only for the <title> tag; the H1 uses `title`. */
+  seo_title: string | null;
   summary: string | null;
   body_md: string;
   category: Category;

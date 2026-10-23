@@ -74,6 +74,7 @@ Skip: rumours without a primary source, pure rewrites of one article, anything y
 - 700–1,500 words for news/comparisons/guides; roundups can be longer.
 - Use `##` subheadings, short paragraphs, a table for comparisons.
 - `title`: 10–160 characters, specific, no clickbait. `summary`: 1–2 sentences, under 200 characters.
+- `seo_title` (**required for every new post**): 10–60 characters, written for search results. It is used only for the page's `<title>` tag; the H1 stays `title`. Lead with the product or model name and the key fact (e.g. `GPT-4o and GPT-4.1 leave the OpenAI API on 14 Jan 2027`). No clickbait, no "…", no trailing punctuation. The database rejects anything outside 10–60 characters.
 - `slug`: lowercase words joined by hyphens, unique (check before inserting).
 - `category`: one of `news`, `new-model`, `comparison`, `event`, `guide`, `roundup`.
 - `related_product`: set only when it genuinely fits, else null — `paidtwice` (AP / invoices / payments),
@@ -85,8 +86,8 @@ Skip: rumours without a primary source, pure rewrites of one article, anything y
 ## 5. Insert
 
 ```sql
-insert into blog_posts (slug, title, summary, body_md, category, tags, sources, fact_flags, related_product, reading_minutes, status, drafted_by, slot, publish_at)
-values ('…', '…', '…', $md$…markdown…$md$, 'comparison', '{qwen,gpt,claude}',
+insert into blog_posts (slug, title, seo_title, summary, body_md, category, tags, sources, fact_flags, related_product, reading_minutes, status, drafted_by, slot, publish_at)
+values ('…', '…', '<≤60-char search title>', '…', $md$…markdown…$md$, 'comparison', '{qwen,gpt,claude}',
         '[{"title":"…","url":"https://…","publisher":"…","accessed_at":"2026-10-12"}]'::jsonb,
         '[]'::jsonb, null, 6, 'pending', 'claude', 'morning', '2026-10-12 09:00:00+05:30');
 insert into blog_post_events (post_id, action, actor, note) values (<new id>, 'drafted', 'claude', null);

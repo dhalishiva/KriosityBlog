@@ -6,6 +6,7 @@ import { renderMarkdown, readingMinutes } from "@/lib/markdown";
 import { categoryLabel } from "@/lib/types";
 import { formatIST } from "@/lib/slots";
 import { blogUrl, products } from "@/lib/site";
+import { metaDescription, postTitle } from "@/lib/seo";
 import Subscribe from "@/components/Subscribe";
 
 export const revalidate = 300;
@@ -18,8 +19,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!post) return { title: "Not found", robots: { index: false } };
   const url = blogUrl(`/${post.slug}`);
   return {
-    title: post.title,
-    description: post.summary ?? undefined,
+    // <title> and meta description only: shortened for search results (lib/seo.ts).
+    // og/twitter/JSON-LD/H1 below keep the full title and summary.
+    title: postTitle(post),
+    description: metaDescription(post.summary),
     alternates: { canonical: url },
     openGraph: {
       type: "article",
